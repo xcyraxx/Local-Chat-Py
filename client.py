@@ -1,7 +1,9 @@
-import socket
 import sys
+import shutil
 import threading
 import errno
+import socket
+import readline
 
 HEADER_LENGTH = 10
 
@@ -29,34 +31,46 @@ def send_msg():
                 message_header = f"{len(message):<{HEADER_LENGTH}}".encode('utf-8')
                 client_socket.send(message_header + message)\
 
+
+
 def rcv_msg():
     while True:
         try:
             while True:
                 username_header = client_socket.recv(HEADER_LENGTH)
-
                 if not len(username_header):
                     print('Connection closed by the server')
                     sys.exit()
 
                 username_length = int(username_header.decode('utf-8').strip())
-
                 username = client_socket.recv(username_length).decode('utf-8')
 
                 message_header = client_socket.recv(HEADER_LENGTH)
                 message_length = int(message_header.decode('utf-8').strip())
                 message = client_socket.recv(message_length).decode('utf-8')
 
-                print(f"\n{username} > {message}\n{my_username}> ", end='')
+                # save current input line
+                saved_line = readline.get_line_buffer()
+                saved_pos = readline.get_begidx()
+
+                cols = shutil.get_terminal_size().columns
+                sys.stdout.write('\r' + ' ' * cols + '\r')
+                sys.stdout.flush()
+
+                print(f"{username} > {message}")
+
+                # restore input
+                sys.stdout.write(f"{my_username}> {saved_line}")
+                sys.stdout.flush()
 
         except IOError as e:
-            if e.errno != errno.EAGAIN and e.errno != errno.EWOULDBLOCK:
-                print('Reading error: {}'.format(str(e)))
+            if e.errno not in (errno.EAGAIN, errno.EWOULDBLOCK):
+                print('Reading error:', e)
                 sys.exit()
             continue
 
         except Exception as e:
-            print('Reading error: '.format(str(e)))
+            print('Reading error:', e)
             sys.exit()
 
 if __name__== "__main__":
