@@ -7,61 +7,51 @@ import readline
 
 HEADER_LENGTH = 10
 
-IP = "127.0.0.1"
-PORT = 4747
+client_socket = None
+on_message_callback = None
 
-my_username = input("Username: ")
-client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+def connect(ip, port, username, on_message):
+	global client_socket, on_message_callback
+	on_message_callback = on_message
+	
+	client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	client_socket.connect((ip, port))
+	client_socket.setblocking(False)
 
-client_socket.connect((IP, PORT))
+	username = username.encode('utf-8')
+	username_header = f"{len(username):<{HEADER_LENGTH}}".encode('utf-8')
+	client_socket.send(username_header + username)
+	
+	recv_thread = threading.Thread(target=rcv_msg, daemon=True)
+	recv_thread.start()
 
-client_socket.setblocking(False)
-username = my_username.encode('utf-8')
-username_header = f"{len(username):<{HEADER_LENGTH}}".encode('utf-8')
-
-
-client_socket.send(username_header + username)
-
-def send_msg():
-    while True:
-            message = input(f'{my_username}> ')
-            
-            if message:
-                message = message.encode('utf-8')
-                message_header = f"{len(message):<{HEADER_LENGTH}}".encode('utf-8')
-                client_socket.send(message_header + message)\
+def send_msg(text):
+	if not text or client_socket is None:
+		return
+	
+	message_bytes = text.encode('utf-8')
+	message_header = f"{len(message_bytes):<{HEADER_LENGTH}}".encode('utf-8')
+	client_socket.send(message_header + message_bytes)
 
 
 
 def rcv_msg():
     while True:
         try:
-            while True:
-                username_header = client_socket.recv(HEADER_LENGTH)
-                if not len(username_header):
-                    print('Connection closed by the server')
-                    sys.exit()
+            username_header = client_socket.recv(HEADER_LENGTH)
+            if not len(username_header):
+                print('Connection closed by the server')
+                sys.exit()
 
-                username_length = int(username_header.decode('utf-8').strip())
-                username = client_socket.recv(username_length).decode('utf-8')
+            username_length = int(username_header.decode('utf-8').strip())
+            username = client_socket.recv(username_length).decode('utf-8')
 
-                message_header = client_socket.recv(HEADER_LENGTH)
-                message_length = int(message_header.decode('utf-8').strip())
-                message = client_socket.recv(message_length).decode('utf-8')
+            message_header = client_socket.recv(HEADER_LENGTH)
+            message_length = int(message_header.decode('utf-8').strip())
+            message = client_socket.recv(message_length).decode('utf-8')
 
-                # save current input line
-                saved_line = readline.get_line_buffer()
-                saved_pos = readline.get_begidx()
-
-                cols = shutil.get_terminal_size().columns
-                sys.stdout.write('\r' + ' ' * cols + '\r')
-                sys.stdout.flush()
-
-                print(f"{username} > {message}")
-
-                # restore input
-                sys.stdout.write(f"{my_username}> {saved_line}")
-                sys.stdout.flush()
+            if on_message_callback:
+            	on_message_callback(username, message)
 
         except IOError as e:
             if e.errno not in (errno.EAGAIN, errno.EWOULDBLOCK):
@@ -73,9 +63,4 @@ def rcv_msg():
             print('Reading error:', e)
             sys.exit()
 
-if __name__== "__main__":
-    t1 = threading.Thread(target=send_msg)
-    t2 = threading.Thread(target=rcv_msg)
 
-    t1.start()
-    t2.start()

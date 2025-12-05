@@ -3,7 +3,7 @@ import select
 
 HEADER_LENGTH = 10
 
-IP = "127.0.0.1"
+IP = input("Enter ip: ")
 PORT = 4747
 
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -36,9 +36,9 @@ def receive_message(client_socket):
     except:
         return False
     
-def broadcast(message):
+def broadcast(sender_socket, message):
     for client_socket in clients:
-                if client_socket != notified_socket:
+                if client_socket != sender_socket:
                     client_socket.send(message)
 
 while True:
@@ -55,8 +55,15 @@ while True:
                 continue
 
             sockets_list.append(client_socket)
-
             clients[client_socket] = user
+
+            join_text = f"{user['data'].decode('utf-8')} joined the chat!"
+            join_bytes = join_text.encode('utf-8')
+            join_header = f"{len(join_bytes):<{HEADER_LENGTH}}".encode('utf-8')
+            name_bytes = "Server".encode('utf-8')
+            name_header = f"{len(name_bytes):<{HEADER_LENGTH}}".encode('utf-8')
+
+            broadcast(client_socket, name_header + name_bytes + join_header + join_bytes)
 
             print('Accepted new connection from {}:{}, username: {}'.format(
                 *client_address, user['data'].decode('utf-8')))
@@ -65,20 +72,29 @@ while True:
             message = receive_message(notified_socket)
 
             if message is False:
-                print('Closed connection from: {}'.format(
-                    clients[notified_socket]['data'].decode('utf-8')))
+                username = clients[notified_socket]['data'].decode('utf-8')
 
                 sockets_list.remove(notified_socket)
+                del clients[notified_socket]  # Optional cleanup
 
-                del clients[notified_socket]
+                left_msg = f"{username} left the chat!"
+                left_bytes = left_msg.encode('utf-8')
+                left_header = f"{len(left_bytes):<{HEADER_LENGTH}}".encode('utf-8')
 
+                name_bytes = "Server".encode('utf-8')
+                name_header = f"{len(name_bytes):<{HEADER_LENGTH}}".encode('utf-8')
+
+                broadcast(notified_socket, name_header + name_bytes + left_header + left_bytes)
+
+                print(f'Closed connection from: {username}')
                 continue
 
             user = clients[notified_socket]
 
             print(
-                f'Received message from {user["data"].decode("utf-8")}: {message["data"].decode("utf-8")}')
+                f'Received message from {user['data'].decode("utf-8")}: {message['data'].decode("utf-8")}')
 
-            
-            broadcast(user['header'] + user['data'] + message['header'] + message['data'])
-
+            broadcast(
+                notified_socket,
+                user['header'] + user['data'] + message['header'] + message['data']
+            )
