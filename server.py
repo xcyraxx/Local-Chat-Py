@@ -54,8 +54,6 @@ def broadcast(sender_socket, message):
 
 def decrypt_message(encrypted_data):
     try:
-         # formatted_data is what we get from client: base64 encoded encrypted bytes
-         # Fernet.decrypt expects bytes.
          return cipher_suite.decrypt(encrypted_data).decode('utf-8')
     except Exception:
         return "<Cannot Decrypt>"
@@ -77,10 +75,6 @@ while True:
             clients[client_socket] = user
 
             join_text = f"{user['data'].decode('utf-8')} joined the chat!"
-            # We don't encrypt server messages yet (simplified), or we assume clients handle plaintext fallbacks
-            # But the client expects everything to be potentially encrypted.
-            # For "joined", it's usually plaintext in this simple app unless we change protocol.
-            # The client `rcv_msg` has a fallback for plaintext.
             
             join_bytes = join_text.encode('utf-8')
             join_header = f"{len(join_bytes):<{HEADER_LENGTH}}".encode('utf-8')
@@ -124,3 +118,4 @@ while True:
                 notified_socket,
                 user['header'] + user['data'] + message['header'] + message['data']
             )
+
