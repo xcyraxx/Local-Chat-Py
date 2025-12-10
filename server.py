@@ -1,10 +1,21 @@
 import socket
 import select
+import base64
+import hashlib
+from cryptography.fernet import Fernet
 
 HEADER_LENGTH = 10
 
 IP = input("Enter ip: ")
 PORT = 4747
+PASSWORD = input("Enter Secret Key: ")
+
+def _generate_key(password):
+    digest = hashlib.sha256(password.encode()).digest()
+    return base64.urlsafe_b64encode(digest)
+
+key = _generate_key(PASSWORD)
+cipher_suite = Fernet(key)
 
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -41,6 +52,14 @@ def broadcast(sender_socket, message):
                 if client_socket != sender_socket:
                     client_socket.send(message)
 
+def decrypt_message(encrypted_data):
+    try:
+         # formatted_data is what we get from client: base64 encoded encrypted bytes
+         # Fernet.decrypt expects bytes.
+         return cipher_suite.decrypt(encrypted_data).decode('utf-8')
+    except Exception:
+        return "<Cannot Decrypt>"
+
 while True:
     read_sockets, _, exception_sockets = select.select(
         sockets_list, [], sockets_list)
@@ -58,6 +77,11 @@ while True:
             clients[client_socket] = user
 
             join_text = f"{user['data'].decode('utf-8')} joined the chat!"
+            # We don't encrypt server messages yet (simplified), or we assume clients handle plaintext fallbacks
+            # But the client expects everything to be potentially encrypted.
+            # For "joined", it's usually plaintext in this simple app unless we change protocol.
+            # The client `rcv_msg` has a fallback for plaintext.
+            
             join_bytes = join_text.encode('utf-8')
             join_header = f"{len(join_bytes):<{HEADER_LENGTH}}".encode('utf-8')
             name_bytes = "Server".encode('utf-8')
@@ -90,9 +114,11 @@ while True:
                 continue
 
             user = clients[notified_socket]
+            
+            decrypted_text = decrypt_message(message['data'])
 
             print(
-                f'Received message from {user['data'].decode("utf-8")}: {message['data'].decode("utf-8")}')
+                f'Received message from {user['data'].decode("utf-8")}: {decrypted_text}')
 
             broadcast(
                 notified_socket,

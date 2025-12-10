@@ -40,7 +40,7 @@ class IPScreen(ttk.Frame):
 		# Grid config
 		self.grid_columnconfigure(0, weight=1)
 		self.grid_rowconfigure(0, weight=1)
-		self.grid_rowconfigure(6, weight=1)  # push content to middle
+		self.grid_rowconfigure(8, weight=1)  # push content to middle
 
 		# IP_entry widget
 		ttk.Label(self, text="Enter Server IP:").grid(row=1, column=0, pady=5)
@@ -51,19 +51,25 @@ class IPScreen(ttk.Frame):
 		ttk.Label(self, text="Enter your name:").grid(row=3, column=0, pady=5)
 		self.user_entry = ttk.Entry(self)
 		self.user_entry.grid(row=4, column=0, pady=5, ipady=3, ipadx=10)
+
+		# Secret Key entry widget
+		ttk.Label(self, text="Enter Secret Key:").grid(row=5, column=0, pady=5)
+		self.key_entry = ttk.Entry(self, show="*")
+		self.key_entry.grid(row=6, column=0, pady=5, ipady=3, ipadx=10)
 		
 		# Connect button
 		ttk.Button(self, text="Connect", command=self.connect_to_server
-		).grid(row=5, column=0, pady=5, ipady=3, ipadx=5)
+		).grid(row=7, column=0, pady=5, ipady=3, ipadx=5)
 
 	def connect_to_server(self):
 		ip = self.ip_entry.get().strip()
 		username = self.user_entry.get().strip()
+		password = self.key_entry.get().strip()
 		
 		controller = self.master.master
 		chat_screen = controller.frames[ChatScreen]
 		
-		client.connect(ip, 4747, username, chat_screen.handle_incoming)
+		client.connect(ip, 4747, username, password, chat_screen.handle_incoming)
 		
 		controller.show_frame(ChatScreen)
 
